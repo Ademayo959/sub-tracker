@@ -21,11 +21,12 @@ const subscriptionSchema = new mongoose.Schema({
     frequency: {
         type: String,
         enum: ['daily', 'weekly', 'monthly', 'yearly'],
+        required: [true, 'Frequency is required'],
     },
     category: {
         type: String,
         enum: ['sports', 'news', 'entertainment', 'lifestyle', 'technology', 'finance', 'politics', 'others'],
-        required: true, 
+        required: true,
     },
     paymentMethod: {
         type: String,
@@ -42,47 +43,57 @@ const subscriptionSchema = new mongoose.Schema({
         required: true,
         validate: {
             validator: (value) => value <= new Date(),
-            message: 'Start date must be in the past', 
-        }
+            message: 'Start date must be in the past',
+        },
     },
     renewalDate: {
         type: Date,
         validate: {
             validator: function (value) {
-                return value > this.startDate
+                // `value` may be undefined on first save — that's fine
+                if (!value) return true;
+                return value > this.startDate;
             },
-            message: 'renewal date must be after the Start date', 
-        }
+            message: 'Renewal date must be after the start date',
+        },
     },
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
         index: true,
-    }
-}, {timestamps: true})
+    },
+}, { timestamps: true });
 
-//Auto-calculate the renewal Date
-subscriptionSchema.pre('save', function (next) {
-    if(!this.renewalDate) {
+// Auto-calculate the renewal date — Mongoose 7+ style (no next())
+subscriptionSchema.pre('save', function () {
+    if (!this.startDate) {
+        throw new Error('startDate is required');
+    }
+
+    if (!this.renewalDate) {
         const renewalPeriods = {
             daily: 1,
             weekly: 7,
             monthly: 30,
             yearly: 365,
+        };
+
+        const days = renewalPeriods[this.frequency];
+        if (!days) {
+            throw new Error(`Invalid frequency: ${this.frequency}`);
         }
 
-        this.renewalDate = new Date(this.startDate)
-        this.renewaldate.setDate(this.renewalDate.getDate() + renewalPeriods[this.frequency])
+        const renewal = new Date(this.startDate);
+        renewal.setDate(renewal.getDate() + days);
+        this.renewalDate = renewal;
     }
 
     if (this.renewalDate < new Date()) {
-        this.status = 'expired'
+        this.status = 'expired';
     }
+});
 
-    next();
-})
+const Subscription = mongoose.model('Subscription', subscriptionSchema);
 
-const Subscription = mongoose.model('Subscription', subscriptionSchema)
-
-export default Subscription
+export default Subscription;

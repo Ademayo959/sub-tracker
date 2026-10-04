@@ -30,3 +30,5 @@ import { ARCJET_KEY } from "./env.js";
     }),
   ],
 });
+
+export default aj;
